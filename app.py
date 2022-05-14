@@ -1,24 +1,24 @@
 from flask import Flask
 from flask import request
-from flask import render_template
-
-from datetime import datetime
 import numpy as np
 import tensorflow_hub as hub
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import json
+import os
 
 # Flask constructor takes the name of 
 # current module (__name__) as argument.
 app = Flask(__name__)
 
-module_url = "model"
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+module_url = ROOT_DIR+"\module"
 
 # Create graph and finalize (optional but recommended).
 g = tf.Graph()
 with g.as_default():
     text_input = tf.placeholder(dtype=tf.string, shape=[None])
-    embed = hub.Module(module_url)
+    embed = hub.load(module_url)
     my_result = embed(text_input)
     init_op = tf.group(
         [tf.global_variables_initializer(), tf.tables_initializer()])
@@ -40,26 +40,35 @@ class NumpyEncoder(json.JSONEncoder):
 @app.route('/')
 # ‘/’ URL is bound with hello_world() function.
 def hello_world():
-    return 'Hello Ahid, Relax, It is going to work'
+    return 'Hello World'
 
 @app.route("/similar", methods=['POST'])
 def similar():
-    print(request.data)
     data = json.loads(request.data)
-    print(data)
-    print([data["a"], data["b"]])
 
     my_result_out = session.run(
         my_result, feed_dict={text_input: [data["a"], data["b"]]})
-    # print(my_result_out)
     corr = np.inner(my_result_out, my_result_out)
+    result = float("{:.2f}".format(corr[0][1]))*100
 
-    # , cls=NumpyEncoder)
-    return json.dumps({"value": float(corr[0][1])}, cls=NumpyEncoder)
+    result_file = open("result.txt", "w")
+    result_file.write(str(result))
+    result_file.close()
+
+    return json.dumps({"value": result}, cls=NumpyEncoder)
   
+@app.route("/getResult", methods=['get'])
+def getResult():
+    result = open("result.txt", "r")
+    result_data = result.read()
+    result.close()
+
+    result_file = open("result.txt", "w")
+    result_file.write("")
+    result_file.close()
+
+    return result_data
+
 # main driver function
 if __name__ == '__main__':
-  
-    # run() method of Flask class runs the application 
-    # on the local development server.
     app.run()
